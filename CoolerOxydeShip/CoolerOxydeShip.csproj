@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+	<PropertyGroup>
+		<LangVersion>9.0</LangVersion>
+	</PropertyGroup>
+	<ItemGroup>
+	  <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3">
+	    <PrivateAssets>all</PrivateAssets>
+	    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	  </PackageReference>
+	</ItemGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>lib\0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>lib\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>lib\BepInEx.dll</HintPath>
+    </Reference>
+	  <Reference Include="CodeRebirth" Publicize="true">
+		  <HintPath>lib\CodeRebirth.dll</HintPath>
+	  </Reference>
+    <Reference Include="com.github.teamxiaolan.dawnlib">
+      <HintPath>lib\com.github.teamxiaolan.dawnlib.dll</HintPath>
+    </Reference>
+    <Reference Include="com.github.teamxiaolan.dawnlib.dusk">
+      <HintPath>lib\com.github.teamxiaolan.dawnlib.dusk.dll</HintPath>
+    </Reference>
+    <Reference Include="LethalNetworkAPI">
+      <HintPath>lib\LethalNetworkAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Netcode.Components">
+      <HintPath>lib\Unity.Netcode.Components.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Netcode.Runtime">
+      <HintPath>lib\Unity.Netcode.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>lib\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>lib\UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>lib\UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+	<Target Name="NetcodePatch" AfterTargets="PostBuildEvent">
+		<Exec Command="netcode-patch -uv 2022.3.62 -nv 1.12.2 -tv 1.0.0 &quot;$(TargetPath)&quot; @(ReferencePathWithRefAssemblies->'&quot;%(Identity)&quot;', ' ')" />
+	</Target>
+</Project>
