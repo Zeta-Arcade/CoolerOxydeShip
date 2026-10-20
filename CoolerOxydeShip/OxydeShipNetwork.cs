@@ -32,7 +32,6 @@ namespace CoolerOxydeShip
         }
         private static void OnMuteShipReceived(MuteShipMessage message)
         {
-            if (NetworkManager.Singleton == null) return;
             if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(message.shipNetworkId, out NetworkObject networkObject)) return;
             OxydeCrashingShip ship = networkObject.GetComponent<OxydeCrashingShip>();
             if (ship == null) return;
@@ -40,7 +39,7 @@ namespace CoolerOxydeShip
         }
         public static void SendMuteShip(ulong shipNetworkId)
         {
-            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening) return;
+            if (!NetworkManager.Singleton.IsListening) return;
             MuteShipRequest.SendServer(new MuteShipMessage { shipNetworkId = shipNetworkId });
         }
         public static void SendShipPosition(ulong shipNetworkId, Vector3 position)

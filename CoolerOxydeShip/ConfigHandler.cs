@@ -26,6 +26,7 @@ namespace CoolerOxydeShip
         public static ConfigEntry<float> shipWaitTimeMax;
         public static ConfigEntry<bool> debtOnAnyPenalty;
         public static ConfigEntry<int> penaltyPerPlayer;
+        public static ConfigEntry<bool> noExtraDebtOnWipe;
         public static ConfigEntry<bool> killEugene;
         public static ConfigEntry<bool> mistressAlwaysKill;
         public static void Init(ConfigFile config)
@@ -49,8 +50,9 @@ namespace CoolerOxydeShip
             maskedMax = config.Bind<int>("Masked Spawning", "Maximum Masked to Spawn", 3, new ConfigDescription("The maximum number of Masked enemies (inclusive) to spawn when a ship crashes. Shouldn't be lower than the minimum.", new AcceptableValueRange<int>(1, 20)));
             maskedDistanceMin = config.Bind<float>("Masked Spawning", "Minimum Masked Distance", 7f, new ConfigDescription("The minimum distance from the ship's crash site that Masked enemies can spawn. A higher value will make Masked enemies spawn further away from the crash site. Shouldn't be higher than the maximum. Be careful to not make it too low, or they might be killed by the initial explosion.", new AcceptableValueRange<float>(0, 30)));
             maskedDistanceMax = config.Bind<float>("Masked Spawning", "Maximum Masked Distance", 12f, new ConfigDescription("The maximum distance from the ship's crash site that Masked enemies can spawn. A higher value will make Masked enemies spawn further away from the crash site. Shouldn't be lower than the minimum. Be carefful to not make it too low, or they might be killed by the initial explosion.", new AcceptableValueRange<float>(0, 30)));
-            debtOnAnyPenalty = config.Bind<bool>("Debt", "Debt on Any Penalty", true, new ConfigDescription("If true, Debt will be added to the Denomination Analyser for any dead crew, not just during a wipe. Note that this debt will stack on TOP of the wipe debt!"));
+            debtOnAnyPenalty = config.Bind<bool>("Debt", "Debt on Any Penalty", true, new ConfigDescription("If true, Debt will also be added to the Denomination Analyser for any dead crew, not just during a wipe."));
             penaltyPerPlayer = config.Bind<int>("Debt", "Penalty per Player", 2, new ConfigDescription("If 'Debt on Any Penalty' is true, this is the amount of debt added for each dead player.", new AcceptableValueRange<int>(0, 999)));
+            noExtraDebtOnWipe = config.Bind<bool>("Debt", "No Extra Debt on Wipe", true, new ConfigDescription("If true, the above extra debt will not be added to the Denomination Analyser when a wipe occurs. If false, you'll be getting 2 punishments!! (1 from this mod, the other from base CodeRebirth)"));
             killEugene = config.Bind<bool>("Misc", "Kill Eugene", true, new ConfigDescription("If true, Eugene will no longer randomly be forcibly-unlocked when landing the ship by setting the chance to 0%."));
             mistressAlwaysKill = config.Bind<bool>("Misc", "Mistress Always Kills", true, new ConfigDescription("If true, the Mistress will always kill a player when they catch them, instead of doing the whole beheading thing."));
         }

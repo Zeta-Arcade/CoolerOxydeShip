@@ -299,7 +299,8 @@ namespace CoolerOxydeShip
             {
                 if (!ConfigHandler.debtOnAnyPenalty.Value) return;
                 if (!NetworkManager.Singleton.IsServer) return; //Only the host should need to run it i think
-                if (playersDead <= 0) return;
+                if (playersDead <= 0) return; //Skip if nobody died
+                if ((playersDead >= StartOfRound.Instance.allPlayerScripts.Count(x => x.isPlayerControlled)) && ConfigHandler.noExtraDebtOnWipe.Value) return; //Skip if everyone died and the config is set to not add extra debt on wipe
                 __instance.RemoveMoney(playersDead * ConfigHandler.penaltyPerPlayer.Value);
             }
         }
