@@ -205,7 +205,11 @@ namespace CoolerOxydeShip
                     return;
                 }
                 System.Random random = new System.Random(StartOfRound.Instance.randomMapSeed);
-                int numberOfMasked = random.Next(ConfigHandler.maskedMin.Value, ConfigHandler.maskedMax.Value + 1);
+                int minMaskedPerPlayer = ConfigHandler.minMaskedPerPlayer.Value * (StartOfRound.Instance.allPlayerScripts.Count() - 1);
+                int maxMaskedPerPlayer = ConfigHandler.maxMaskedPerPlayer.Value * (StartOfRound.Instance.allPlayerScripts.Count() - 1);
+                int minMasked = ConfigHandler.maskedMin.Value + minMaskedPerPlayer;
+                int maxMasked = Math.Clamp(ConfigHandler.maskedMax.Value + maxMaskedPerPlayer, minMasked, ConfigHandler.maskedCap.Value);
+                int numberOfMasked = random.Next(minMasked, maxMasked + 1);
                 Logger.LogDebug($"Ship spawning {numberOfMasked} Masked.");
                 for (int i = 0; i < numberOfMasked; i++)
                 {

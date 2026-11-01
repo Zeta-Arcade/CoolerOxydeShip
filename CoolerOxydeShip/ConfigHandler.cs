@@ -19,6 +19,9 @@ namespace CoolerOxydeShip
         public static ConfigEntry<bool> shouldSpawnMaskedOnFirstCrash;
         public static ConfigEntry<int> maskedMin;
         public static ConfigEntry<int> maskedMax;
+        public static ConfigEntry<int> minMaskedPerPlayer;
+        public static ConfigEntry<int> maxMaskedPerPlayer;
+        public static ConfigEntry<int> maskedCap;
         public static ConfigEntry<float> maskedDistanceMin;
         public static ConfigEntry<float> maskedDistanceMax;
         public static ConfigEntry<bool> muteShipOnTabletCollection;
@@ -47,7 +50,10 @@ namespace CoolerOxydeShip
             shouldSpawnMasked = config.Bind<bool>("Masked Spawning", "Should Masked Spawn", true, new ConfigDescription("If true, Masked enemies will spawn when a ship crashes."));
             shouldSpawnMaskedOnFirstCrash = config.Bind<bool>("Masked Spawning", "Should Masked Spawn on First Crash", false, new ConfigDescription("If true, Masked enemies will always spawn at a crashed ship. If false, then only crashed ships encountered after Oxyde has been unlocked will spawn Masked enemies."));
             maskedMin = config.Bind<int>("Masked Spawning", "Minimum Masked to Spawn", 1, new ConfigDescription("The minimum number of Masked enemies (inclusive) to spawn when a ship crashes. Shouldn't be higher than the maximum.", new AcceptableValueRange<int>(0, 20)));
-            maskedMax = config.Bind<int>("Masked Spawning", "Maximum Masked to Spawn", 3, new ConfigDescription("The maximum number of Masked enemies (inclusive) to spawn when a ship crashes. Shouldn't be lower than the minimum.", new AcceptableValueRange<int>(1, 20)));
+            maskedMax = config.Bind<int>("Masked Spawning", "Maximum Masked to Spawn", 2, new ConfigDescription("The maximum number of Masked enemies (inclusive) to spawn when a ship crashes. Shouldn't be lower than the minimum.", new AcceptableValueRange<int>(1, 20)));
+            minMaskedPerPlayer = config.Bind<int>("Masked Spawning", "Masked Min Per Player Increase", 0, new ConfigDescription("Adds this value to the Min Masked spawn count, for each player in the lobby after the first. Useful if you want to increase the amount of Masked that spawn with lobby size", new AcceptableValueRange<int>(0, 10)));
+            maxMaskedPerPlayer = config.Bind<int>("Masked Spawning", "Masked Max Per Player Increase", 0, new ConfigDescription("Adds this value to the Max Masked spawn count, for each player in the lobby after the first. Useful if you want to increase the amount of Masked that spawn with lobby size", new AcceptableValueRange<int>(0, 10)));
+            maskedCap = config.Bind<int>("Masked Spawning", "Masked Cap", 99, new ConfigDescription("The maximum amount of Masked that can spawn from the ship, overriding the above values. No more Masked can spawn than this value from one crashed ship.", new AcceptableValueRange<int>(1, 100)));
             maskedDistanceMin = config.Bind<float>("Masked Spawning", "Minimum Masked Distance", 7f, new ConfigDescription("The minimum distance from the ship's crash site that Masked enemies can spawn. A higher value will make Masked enemies spawn further away from the crash site. Shouldn't be higher than the maximum. Be careful to not make it too low, or they might be killed by the initial explosion.", new AcceptableValueRange<float>(0, 30)));
             maskedDistanceMax = config.Bind<float>("Masked Spawning", "Maximum Masked Distance", 12f, new ConfigDescription("The maximum distance from the ship's crash site that Masked enemies can spawn. A higher value will make Masked enemies spawn further away from the crash site. Shouldn't be lower than the minimum. Be carefful to not make it too low, or they might be killed by the initial explosion.", new AcceptableValueRange<float>(0, 30)));
             debtOnAnyPenalty = config.Bind<bool>("Debt", "Debt on Any Penalty", true, new ConfigDescription("If true, Debt will also be added to the Denomination Analyser for any dead crew, not just during a wipe."));

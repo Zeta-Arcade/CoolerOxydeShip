@@ -4,6 +4,6 @@
     {
         public const string modGUID = "ZetaArcade.CoolerOxydeShip";
         public const string modName = "CoolerOxydeShip";
-        public const string modVersion = "0.0.2";
+        public const string modVersion = "0.0.4";
     }
 }
