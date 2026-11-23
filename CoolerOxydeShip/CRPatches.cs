@@ -1,6 +1,8 @@
 ﻿using BepInEx;
+using BepInEx.Bootstrap;
 using CodeRebirth;
 using CodeRebirth.src.Content.Enemies;
+using CodeRebirth.src.Content.Items;
 using CodeRebirth.src.Content.Maps;
 using CodeRebirth.src.Content.Unlockables;
 using CodeRebirth.src.Util;
@@ -9,6 +11,7 @@ using Dawn.Utils;
 using GameNetcodeStuff;
 using HarmonyLib;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Netcode;
@@ -25,6 +28,7 @@ namespace CoolerOxydeShip
         public static BepInEx.Logging.ManualLogSource Logger;
         public static CoolerOxydeShipPatch Instance;
         internal static readonly Dictionary<OxydeCrashingShip, Vector3> TargetPositions = new();
+        internal static readonly HashSet<ulong> DebtCollectorVictims = new();
 
         private void Awake()
         {
@@ -33,9 +37,14 @@ namespace CoolerOxydeShip
                 Instance = this;
             }
             Logger = base.Logger;
-            ConfigHandler.Init(Config); 
+            ConfigHandler.Init(Config);
             OxydeShipNetwork.Init();
             harmony.PatchAll();
+            if (Chainloader.PluginInfos.ContainsKey("HQ_Team.LethalThingsReloaded.Internals"))
+            {
+                harmony.Patch(AccessTools.Method("LethalThings.MonoBehaviours.FlareController:OnNetworkSpawn"), prefix: new HarmonyMethod(typeof(FlaregunOxydeNerfPatch), nameof(FlaregunOxydeNerfPatch.Prefix)));
+                Logger.LogInfo("LethalThings detected! Flare duration patch enabled.");
+            }
             Logger.LogInfo($"Plugin is loaded!");
         }
         [HarmonyPatch(typeof(OxydeCrashingShip), nameof(OxydeCrashingShip.OnNetworkSpawn))]
@@ -118,8 +127,8 @@ namespace CoolerOxydeShip
                 }
             }
             public static void StopAlarm(OxydeCrashingShip shipRef)
-            { 
-                foreach (AudioSource audio in shipRef.GetComponentsInChildren<AudioSource>(true)) 
+            {
+                foreach (AudioSource audio in shipRef.GetComponentsInChildren<AudioSource>(true))
                 {
                     if (audio.name != "ShipAlarm") continue; //I FOUND YOU you little rascal
                     audio.Stop();
@@ -278,7 +287,6 @@ namespace CoolerOxydeShip
                 if (!NetworkManager.Singleton.IsServer) return true; //Skip if client, config etc.
                 PlayerControllerB player = playerControllerReference;
                 if (player == null) return false;
-                Logger.LogDebug($"Mistress executing player {player.playerClientId}");
                 OxydeShipNetwork.SendMistressKill(player.playerClientId);
                 return false;
             }
@@ -295,7 +303,7 @@ namespace CoolerOxydeShip
                 }
             }
         }
-        [HarmonyPatch(typeof(MoneyCounter), "CalculateCoinPenalty")]
+        [HarmonyPatch(typeof(MoneyCounter), nameof(MoneyCounter.CalculateCoinPenalty))]
         public static class MoneyCounterPenaltyPatch
         {
             [HarmonyPostfix]
@@ -304,8 +312,281 @@ namespace CoolerOxydeShip
                 if (!ConfigHandler.debtOnAnyPenalty.Value) return;
                 if (!NetworkManager.Singleton.IsServer) return; //Only the host should need to run it i think
                 if (playersDead <= 0) return; //Skip if nobody died
-                if ((playersDead >= StartOfRound.Instance.allPlayerScripts.Count(x => x.isPlayerControlled)) && ConfigHandler.noExtraDebtOnWipe.Value) return; //Skip if everyone died and the config is set to not add extra debt on wipe
-                __instance.RemoveMoney(playersDead * ConfigHandler.penaltyPerPlayer.Value);
+                int totalPlayers = StartOfRound.Instance.allPlayerScripts.Count(x => x.isPlayerControlled);
+                if (playersDead >= totalPlayers && ConfigHandler.noExtraDebtOnWipe.Value) return;
+                int validDeaths = playersDead - DebtCollectorVictims.Count;
+                if (validDeaths <= 0) return;
+                __instance.RemoveMoney(validDeaths * ConfigHandler.penaltyPerPlayer.Value);
+            }
+        }
+        [HarmonyPatch(typeof(MoneyCounter), nameof(MoneyCounter.RemoveMoney))]
+        internal static class MoneyCounterRemoveShieldPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix()
+            {
+                if (!NetworkManager.Singleton.IsServer) return;
+                if (!ConfigHandler.noDebtShield.Value) return;
+                NamespacedKey debtKey = NamespacedKey.From("code_rebirth", "went_to_debt_once");
+                DawnLib.GetCurrentSave()?.Set(debtKey, true);
+            }
+        }
+        [HarmonyPatch(typeof(StartOfRound), nameof(StartOfRound.StartGame))]
+        internal static class ResetDebtCollectorVictimsPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix()
+            {
+                DebtCollectorVictims.Clear();
+            }
+        }
+        [HarmonyPatch(typeof(DebtCollector), nameof(DebtCollector.KillTargetPlayer))]
+        internal static class DebtCollectorKillPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(DebtCollector __instance, out PlayerControllerB __state)
+            {
+                __state = __instance.targetPlayer;
+            }
+            [HarmonyPostfix]
+            private static void Postfix(PlayerControllerB __state)
+            {
+                if (__state == null || !__state.IsLocalPlayer()) return;
+                if (!__state.isPlayerDead) return;
+                OxydeShipNetwork.SendDebtCollectorKill(__state.playerClientId);
+            }
+        }
+        internal static void RegisterDebtCollectorKill(PlayerControllerB player)
+        {
+            if (!NetworkManager.Singleton.IsServer) return;
+            if (!DebtCollectorVictims.Add(player.playerClientId)) return;
+            MoneyCounter counter = MoneyCounter.Instance!; //Proly doesn't need ! but the green squiggly line was pissing me off
+            if (counter != null && ConfigHandler.coinsPerKill.Value > 0)
+            {
+                counter.AddMoney(ConfigHandler.coinsPerKill.Value);
+            }
+        }
+        [HarmonyPatch(typeof(DebtCollector), nameof(DebtCollector.DoSlashAttack))]
+        internal static class DebtCollectorSlashPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(out HashSet<ulong> __state)
+            {
+                __state = new HashSet<ulong>();
+                foreach (PlayerControllerB player in StartOfRound.Instance.allPlayerScripts)
+                {
+                    if (player == null || !player.IsLocalPlayer()) continue;
+                    if (player.isPlayerDead) continue;
+                    __state.Add(player.playerClientId);
+                }
+            }
+            [HarmonyPostfix]
+            private static void Postfix(HashSet<ulong> __state)
+            {
+                foreach (PlayerControllerB player in StartOfRound.Instance.allPlayerScripts)
+                {
+                    if (player == null || !player.IsLocalPlayer()) continue;
+                    if (!__state.Contains(player.playerClientId)) continue;
+                    if (!player.isPlayerDead) continue;
+                    OxydeShipNetwork.SendDebtCollectorKill(player.playerClientId);
+                }
+            }
+        }
+        [HarmonyPatch(typeof(Merchant), "Steal")]
+        internal static class MerchantStealPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(Merchant __instance, int priceOfStolenItem, Dictionary<GrabbableObject, int> ___itemsOnSale)
+            {
+                foreach (GrabbableObject item in ___itemsOnSale.Keys)
+                {
+                    item.grabbable = false;
+                }
+                __instance.bugleBoy.DisableSelf();
+                __instance.tipPad.CloseDonations();
+                __instance.merchantAnimator.SetTrigger("steal");
+                if (__instance.IsServer)
+                {
+                    int penalty = Mathf.RoundToInt(priceOfStolenItem * ConfigHandler.merchantStealMultiplier.Value);
+                    MoneyCounter.Instance!.RemoveMoney(penalty);
+                }
+                return false;
+            }
+        }
+        [HarmonyPatch(typeof(MerchantTipPad), nameof(MerchantTipPad.GetTippedAmount))]
+        internal static class MerchantTippingPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(ref float __result)
+            {
+                float maxDivisor = ConfigHandler.maxTipDivisor.Value;
+                __result *= (maxDivisor - 1f) / 0.3f; //0.3 is the default divisor, so this should scale it, like "1.3" max (Default config) = "1.3 - 1" = "0.3", and "0.3/0.3" is 1, so its default then
+            }
+        }
+        [HarmonyPatch(typeof(RabbitMagician), "KillAndSwitchTargetServerRpc")]
+        internal static class RabbitDistancePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(RabbitMagician __instance, PlayerControllerReference player)
+            {
+                if (ConfigHandler.rabbitDistanceLimit.Value <= 0f) return true;
+                PlayerControllerB target = player;
+                if (target == null || __instance.targetPlayer == null) return true;
+                float distance = Vector3.Distance(target.transform.position, __instance.targetPlayer.transform.position);
+                if (distance <= ConfigHandler.rabbitDistanceLimit.Value) return true;
+                __instance.SwitchToBehaviourStateOnLocalClient((int)RabbitMagician.RabbitMagicianState.Attached); //Swap it back to attached, or else it bugs out sincei t was already put into switching target state
+                return false;
+            }
+        }
+        internal static class FlaregunOxydeNerfPatch
+        {
+            internal static void Prefix(object __instance)
+            {
+                if (!NetworkManager.Singleton.IsServer) return;
+                if (RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") != true) return;
+                AccessTools.Field(__instance.GetType(), "flareDuration")?.SetValue(__instance, ConfigHandler.oxydeFlareDuration.Value);
+            }
+        }
+        [HarmonyPatch(typeof(MerchantBarrel))]
+        internal static class MerchantBarrelCachePatch
+        {
+            [HarmonyPatch("OnEnable")]
+            [HarmonyPostfix]
+            private static void OnEnablePostfix(MerchantBarrel __instance)
+            {
+                OxydeNukeItemSpawnsPatch.AddBarrels(__instance);
+            }
+            [HarmonyPatch("OnDisable")]
+            [HarmonyPostfix]
+            private static void OnDisablePostfix(MerchantBarrel __instance)
+            {
+                OxydeNukeItemSpawnsPatch.RemoveBarrels(__instance);
+            }
+        }
+        [HarmonyPatch(typeof(NetworkObject), nameof(NetworkObject.Spawn))]
+        internal static class OxydeNukeItemSpawnsPatch
+        {
+            //Should probably make it a config rather than hardcoding it, idk
+            private static readonly HashSet<string> BlockedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Jetpack", "Spray paint", "Skull", "Clock", "Remote Detonator", "Yield sign", "Nitroglycerin Crate", "Lockpicker", "Flashlight", "Zap gun", "Pro-flashlight", "Extension ladder", "Ammo", "Mole Digger", "Clown horn", "Magic 7 ball", "Key", "Stun grenade" };
+            private static readonly HashSet<MerchantBarrel> BarrelRefs = new HashSet<MerchantBarrel>();
+            internal static void AddBarrels(MerchantBarrel barrel)
+            {
+                BarrelRefs.Add(barrel);
+            }
+            internal static void RemoveBarrels(MerchantBarrel barrel)
+            {
+                BarrelRefs.Remove(barrel);
+            }
+            [HarmonyPostfix]
+            private static void Postfix(NetworkObject __instance)
+            {
+                if (!ConfigHandler.oxydeDeleteSpawnedGear.Value) return;
+                if (!NetworkManager.Singleton.IsServer) return;
+                if (StartOfRound.Instance == null) return;
+                if (!StartOfRound.Instance.inShipPhase) return;
+                if (RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") != true) return;
+                GrabbableObject item = __instance.GetComponent<GrabbableObject>();
+                if (item?.itemProperties == null) return;
+                if (item.isInShipRoom || item.isInElevator) return;
+                if (!BlockedItems.Contains(item.itemProperties.itemName)) return;
+                Instance.StartCoroutine(RemoveItem(__instance, item));
+            }
+            private static IEnumerator RemoveItem(NetworkObject networkObject, GrabbableObject item)
+            {
+                yield return null;
+                if (networkObject == null || !networkObject.IsSpawned) yield break;
+                if (!NetworkManager.Singleton.IsServer) yield break;
+                if (item == null) yield break;
+                foreach (MerchantBarrel barrel in BarrelRefs)
+                {
+                    if (barrel.currentlySpawnedGrabbableObject == item)
+                    {
+                        yield break;
+                    }
+                }
+                Logger.LogInfo($"Removing item that spawned on Oxyde: {networkObject.name}");
+                networkObject.Despawn(true);
+            }
+        }
+        [HarmonyPatch(typeof(Merchant), nameof(Merchant.Start))]
+        internal static class MerchantAnimationSpeedPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(Merchant __instance)
+            {
+                if (__instance.merchantAnimator == null) return;
+                __instance.merchantAnimator.speed = ConfigHandler.merchantSpeedMultiplier.Value;
+            }
+        }
+        [HarmonyPatch(typeof(Merchant), "PayUpBoy")] //Why is it called that lol
+        internal static class MerchantPurchaseSpeedPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(Merchant __instance, int itemCost, Dictionary<GrabbableObject, int> ___itemsOnSale, ref IEnumerator __result)
+            {
+                __result = FasterBuy(__instance, itemCost, ___itemsOnSale);
+                return false;
+            }
+            private static IEnumerator FasterBuy(Merchant merchant, int itemCost, Dictionary<GrabbableObject, int> itemsOnSale)
+            {
+                if (merchant.IsServer)
+                {
+                    MoneyCounter.Instance!.RemoveMoney(itemCost);
+                }
+                foreach (var item in itemsOnSale)
+                {
+                    if (item.Key != null)
+                    {
+                        merchant.SetupGrabbableTooltip(item.Key, item.Value);
+                    }
+                }
+                foreach (GrabbableObject item in itemsOnSale.Keys)
+                {
+                    if (item != null)
+                    {
+                        item.grabbable = false;
+                    } 
+                }
+                merchant.merchantAnimator.SetTrigger("purchase");
+                float speed = merchant.merchantAnimator.speed;
+                yield return new WaitForSeconds(merchant.PurchaseAnimation.length / speed);
+                foreach (GrabbableObject item in itemsOnSale.Keys)
+                {
+                    if (item != null)
+                    {
+                        item.grabbable = true;
+                    } 
+                }
+            }
+        }
+        [HarmonyPatch(typeof(CompactorToby), nameof(CompactorToby.TryCompactItemServerRpc))]
+        internal static class AntiDuplicateCubePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(CompactorToby __instance)
+            {
+                if (!__instance.IsServer) return true;
+                if (__instance.compacting) return false;
+                __instance.compacting = true;
+                return true;
+            }
+        }
+        [HarmonyPatch(typeof(MarrowSplitter), "DoHitStuff")]
+        internal static class MarrowSplitterExploitPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(ref int ____increaseAmount, out int __state)
+            {
+                __state = ____increaseAmount;
+                if (StartOfRound.Instance.inShipPhase || RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Gordion") == true || RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Galetry") == true || RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") == true)
+                {
+                    ____increaseAmount = 0;
+                }
+            }
+            [HarmonyPostfix]
+            private static void Postfix(ref int ____increaseAmount, int __state)
+            {
+                ____increaseAmount = __state;
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using CodeRebirth.src.Content.Maps;
+﻿using CodeRebirth.src.Content.Enemies;
+using CodeRebirth.src.Content.Maps;
 using Dawn.Utils;
 using GameNetcodeStuff;
 using LethalNetworkAPI;
@@ -15,6 +16,7 @@ namespace CoolerOxydeShip
         public static LNetworkMessage<MuteShipMessage> MuteShipBroadcast;
         public static LNetworkMessage<ShipPositionMessage> ShipPositionBroadcast;
         public static LNetworkMessage<MistressKillMessage> MistressKillBroadcast;
+        public static LNetworkMessage<DebtCollectorKillMessage> DebtCollectorKillRequest;
         public static readonly Dictionary<ulong, Vector3> ShipPositions = new();
         public static void Init()
         {
@@ -22,6 +24,7 @@ namespace CoolerOxydeShip
             MuteShipBroadcast = LNetworkMessage<MuteShipMessage>.Create("OxydeMuteShipBroadcast", onClientReceived: OnMuteShipReceived);
             ShipPositionBroadcast = LNetworkMessage<ShipPositionMessage>.Create("OxydeShipPosition", onClientReceived: OnShipPositionReceived);
             MistressKillBroadcast = LNetworkMessage<MistressKillMessage>.Create("MistressRealKill", onClientReceived: OnMistressKillReceived);
+            DebtCollectorKillRequest = LNetworkMessage<DebtCollectorKillMessage>.Create("DebtCollectorKillRequest", onServerReceived: OnDebtCollectorKillReceived);
         }
         private static void OnMuteShipRequest(MuteShipMessage message, ulong senderClientId)
         {
@@ -70,6 +73,20 @@ namespace CoolerOxydeShip
                 return;
             }
         }
+        public static void SendDebtCollectorKill(ulong playerId)
+        {
+            if (!NetworkManager.Singleton.IsListening) return;
+            DebtCollectorKillRequest.SendServer(new DebtCollectorKillMessage { playerId = playerId });
+        }
+        private static void OnDebtCollectorKillReceived(
+            DebtCollectorKillMessage message, ulong senderClientId)
+        {
+            if (!NetworkManager.Singleton.IsServer) return;
+            if (senderClientId != message.playerId) return;
+            PlayerControllerB player = StartOfRound.Instance.allPlayerScripts.FirstOrDefault(p => p.playerClientId == message.playerId);
+            if (player == null) return;
+            CoolerOxydeShipPatch.RegisterDebtCollectorKill(player);
+        }
     }
     public class MuteShipMessage
     {
@@ -83,6 +100,10 @@ namespace CoolerOxydeShip
         public float z;
     }
     public class MistressKillMessage
+    {
+        public ulong playerId;
+    }
+    public class DebtCollectorKillMessage
     {
         public ulong playerId;
     }
