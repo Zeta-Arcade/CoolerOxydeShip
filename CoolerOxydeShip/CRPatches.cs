@@ -484,6 +484,7 @@ namespace CoolerOxydeShip
                 if (!NetworkManager.Singleton.IsServer) return;
                 if (StartOfRound.Instance == null) return;
                 if (!StartOfRound.Instance.inShipPhase) return;
+                if (ConfigHandler.oxydeDontDeleteOnDeadline.Value && TimeOfDay.Instance.daysUntilDeadline == 0) return;
                 if (RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") != true) return;
                 GrabbableObject item = __instance.GetComponent<GrabbableObject>();
                 if (item?.itemProperties == null) return;
