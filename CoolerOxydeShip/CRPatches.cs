@@ -447,36 +447,12 @@ namespace CoolerOxydeShip
                 AccessTools.Field(__instance.GetType(), "flareDuration")?.SetValue(__instance, ConfigHandler.oxydeFlareDuration.Value);
             }
         }
-        [HarmonyPatch(typeof(MerchantBarrel))]
-        internal static class MerchantBarrelCachePatch
-        {
-            [HarmonyPatch("OnEnable")]
-            [HarmonyPostfix]
-            private static void OnEnablePostfix(MerchantBarrel __instance)
-            {
-                OxydeNukeItemSpawnsPatch.AddBarrels(__instance);
-            }
-            [HarmonyPatch("OnDisable")]
-            [HarmonyPostfix]
-            private static void OnDisablePostfix(MerchantBarrel __instance)
-            {
-                OxydeNukeItemSpawnsPatch.RemoveBarrels(__instance);
-            }
-        }
         [HarmonyPatch(typeof(NetworkObject), nameof(NetworkObject.Spawn))]
         internal static class OxydeNukeItemSpawnsPatch
         {
             //Should probably make it a config rather than hardcoding it, idk
             private static readonly HashSet<string> BlockedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Jetpack", "Spray paint", "Skull", "Clock", "Remote Detonator", "Yield sign", "Nitroglycerin Crate", "Lockpicker", "Flashlight", "Zap gun", "Pro-flashlight", "Extension ladder", "Ammo", "Mole Digger", "Clown horn", "Magic 7 ball", "Key", "Stun grenade" };
             private static readonly HashSet<MerchantBarrel> BarrelRefs = new HashSet<MerchantBarrel>();
-            internal static void AddBarrels(MerchantBarrel barrel)
-            {
-                BarrelRefs.Add(barrel);
-            }
-            internal static void RemoveBarrels(MerchantBarrel barrel)
-            {
-                BarrelRefs.Remove(barrel);
-            }
             [HarmonyPostfix]
             private static void Postfix(NetworkObject __instance)
             {
@@ -486,6 +462,11 @@ namespace CoolerOxydeShip
                 if (!StartOfRound.Instance.inShipPhase) return;
                 if (ConfigHandler.oxydeDontDeleteOnDeadline.Value && TimeOfDay.Instance.daysUntilDeadline == 0) return;
                 if (RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") != true) return;
+                if (__instance.TryGetComponent(out MerchantBarrel barrel))
+                {
+                    BarrelRefs.Add(barrel);
+                    return;
+                }
                 GrabbableObject item = __instance.GetComponent<GrabbableObject>();
                 if (item?.itemProperties == null) return;
                 if (item.isInShipRoom || item.isInElevator) return;
@@ -498,6 +479,7 @@ namespace CoolerOxydeShip
                 if (networkObject == null || !networkObject.IsSpawned) yield break;
                 if (!NetworkManager.Singleton.IsServer) yield break;
                 if (item == null) yield break;
+                BarrelRefs.RemoveWhere(barrel => barrel == null || !barrel.IsSpawned);
                 foreach (MerchantBarrel barrel in BarrelRefs)
                 {
                     if (barrel.currentlySpawnedGrabbableObject == item)
