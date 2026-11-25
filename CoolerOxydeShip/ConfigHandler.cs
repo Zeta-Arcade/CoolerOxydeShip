@@ -89,7 +89,7 @@ namespace CoolerOxydeShip
             //Oxyde
             oxydeFlareDuration = config.Bind<float>("Oxyde", "Oxyde Flare Duration", 20f, new ConfigDescription("The duration (in seconds) of the flare when you used a LethalThingsReloaded Flaregun on Oxyde. Set to 0 to disable.", new AcceptableValueRange<float>(0f, 60f)));
             oxydeDeleteSpawnedGear = config.Bind<bool>("Oxyde", "Delete Spawned Gear", true, new ConfigDescription("If true, MOST of the extra gear that can spawn on Oxyde 'E.g. Jetpacks, Nitro crates, Flashlights' won't spawn in."));
-            oxydeDontDeleteOnDeadline = config.Bind<bool>("Oxyde", "Don't Delete Spawned Gear on Deadline", false, new ConfigDescription("If true, the extra gear that can spawn on Oxyde 'E.g. Jetpacks, Nitro crates, Flashlights' will not be deleted during Deadline day, since there is actually risk involved and it can't be done infinitely. This requires the 'Delete Spawned Gear' setting to be enabled."));
+            oxydeDontDeleteOnDeadline = config.Bind<bool>("Oxyde", "Dont Delete Spawned Gear on Deadline", false, new ConfigDescription("If true, the extra gear that can spawn on Oxyde 'E.g. Jetpacks, Nitro crates, Flashlights' will not be deleted during Deadline day, since there is actually risk involved and it can't be done infinitely. This requires the 'Delete Spawned Gear' setting to be enabled."));
         }
     }
 }
