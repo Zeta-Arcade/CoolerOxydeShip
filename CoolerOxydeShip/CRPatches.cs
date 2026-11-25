@@ -460,12 +460,16 @@ namespace CoolerOxydeShip
                 if (!NetworkManager.Singleton.IsServer) return;
                 if (StartOfRound.Instance == null) return;
                 if (!StartOfRound.Instance.inShipPhase) return;
-                if (ConfigHandler.oxydeDontDeleteOnDeadline.Value && TimeOfDay.Instance.daysUntilDeadline == 0) return;
                 if (RoundManager.Instance?.currentLevel?.PlanetName?.Contains("Oxyde") != true) return;
                 if (__instance.TryGetComponent(out MerchantBarrel barrel))
                 {
                     BarrelRefs.Add(barrel);
                     return;
+                }
+                if (ConfigHandler.oxydeDontDeleteOnDeadline.Value)
+                {
+                    if (TimeOfDay.Instance == null) return;
+                    if (TimeOfDay.Instance.daysUntilDeadline == 0) return;
                 }
                 GrabbableObject item = __instance.GetComponent<GrabbableObject>();
                 if (item?.itemProperties == null) return;
